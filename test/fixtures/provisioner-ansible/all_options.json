@@ -3,7 +3,7 @@
     "provisioners": [
       {
         "type": "shell-local",
-        "command": "echo 'TODO(bc): write the public key to $HOME/.ssh/known_hosts and stop using ANSIBLE_HOST_KEY_CHECKING=False'"
+        "command": "echo 'TODO(bhcleek): write the public key to $HOME/.ssh/known_hosts and stop using ANSIBLE_HOST_KEY_CHECKING=False'"
       }, {
         "type": "shell",
         "inline": [
