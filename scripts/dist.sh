@@ -20,7 +20,7 @@ fi
 if [ -z $NOTAG ]; then
   echo "==> Tagging..."
   git commit --allow-empty -a -m "Cut version $VERSION"
-  git tag -a -m "Version $VERSION" -s -u "v${VERSION}" $RELBRANCH
+  git tag -a -m "Version $VERSION" -s "v${VERSION}" $RELBRANCH
 fi
 
 # Zip all the files
