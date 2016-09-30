@@ -44,11 +44,11 @@ func testUi() *packer.BasicUi {
 	}
 }
 
-func TestPostProcessor_ImplementsPostProcessor(t *testing.T) {
+func testPostProcessor_ImplementsPostProcessor(t *testing.T) {
 	var _ packer.PostProcessor = new(PostProcessor)
 }
 
-func TestproviderFromBuilderName(t *testing.T) {
+func testproviderFromBuilderName(t *testing.T) {
 	if providerFromBuilderName("foobar") != "foobar" {
 		t.Fatal("should copy unknown provider")
 	}
