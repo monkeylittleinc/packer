@@ -33,11 +33,14 @@ import (
 	amazonimportpostprocessor "github.com/mitchellh/packer/post-processor/amazon-import"
 	artificepostprocessor "github.com/mitchellh/packer/post-processor/artifice"
 	atlaspostprocessor "github.com/mitchellh/packer/post-processor/atlas"
+	checksumpostprocessor "github.com/mitchellh/packer/post-processor/checksum"
 	compresspostprocessor "github.com/mitchellh/packer/post-processor/compress"
 	dockerimportpostprocessor "github.com/mitchellh/packer/post-processor/docker-import"
 	dockerpushpostprocessor "github.com/mitchellh/packer/post-processor/docker-push"
 	dockersavepostprocessor "github.com/mitchellh/packer/post-processor/docker-save"
 	dockertagpostprocessor "github.com/mitchellh/packer/post-processor/docker-tag"
+	googlecomputeexportpostprocessor "github.com/mitchellh/packer/post-processor/googlecompute-export"
+	manifestpostprocessor "github.com/mitchellh/packer/post-processor/manifest"
 	shelllocalpostprocessor "github.com/mitchellh/packer/post-processor/shell-local"
 	vagrantpostprocessor "github.com/mitchellh/packer/post-processor/vagrant"
 	vagrantcloudpostprocessor "github.com/mitchellh/packer/post-processor/vagrant-cloud"
@@ -98,18 +101,21 @@ var Provisioners = map[string]packer.Provisioner{
 }
 
 var PostProcessors = map[string]packer.PostProcessor{
-	"amazon-import": new(amazonimportpostprocessor.PostProcessor),
-	"artifice":      new(artificepostprocessor.PostProcessor),
-	"atlas":         new(atlaspostprocessor.PostProcessor),
-	"compress":      new(compresspostprocessor.PostProcessor),
-	"docker-import": new(dockerimportpostprocessor.PostProcessor),
-	"docker-push":   new(dockerpushpostprocessor.PostProcessor),
-	"docker-save":   new(dockersavepostprocessor.PostProcessor),
-	"docker-tag":    new(dockertagpostprocessor.PostProcessor),
-	"shell-local":   new(shelllocalpostprocessor.PostProcessor),
-	"vagrant":       new(vagrantpostprocessor.PostProcessor),
-	"vagrant-cloud": new(vagrantcloudpostprocessor.PostProcessor),
-	"vsphere":       new(vspherepostprocessor.PostProcessor),
+	"amazon-import":        new(amazonimportpostprocessor.PostProcessor),
+	"artifice":             new(artificepostprocessor.PostProcessor),
+	"atlas":                new(atlaspostprocessor.PostProcessor),
+	"checksum":             new(checksumpostprocessor.PostProcessor),
+	"compress":             new(compresspostprocessor.PostProcessor),
+	"docker-import":        new(dockerimportpostprocessor.PostProcessor),
+	"docker-push":          new(dockerpushpostprocessor.PostProcessor),
+	"docker-save":          new(dockersavepostprocessor.PostProcessor),
+	"docker-tag":           new(dockertagpostprocessor.PostProcessor),
+	"googlecompute-export": new(googlecomputeexportpostprocessor.PostProcessor),
+	"manifest":             new(manifestpostprocessor.PostProcessor),
+	"shell-local":          new(shelllocalpostprocessor.PostProcessor),
+	"vagrant":              new(vagrantpostprocessor.PostProcessor),
+	"vagrant-cloud":        new(vagrantcloudpostprocessor.PostProcessor),
+	"vsphere":              new(vspherepostprocessor.PostProcessor),
 }
 
 var pluginRegexp = regexp.MustCompile("packer-(builder|post-processor|provisioner)-(.+)")

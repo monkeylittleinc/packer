@@ -16,21 +16,22 @@ import (
 )
 
 type StepRunSourceInstance struct {
-	AssociatePublicIpAddress bool
-	AvailabilityZone         string
-	BlockDevices             BlockDevices
-	Debug                    bool
-	EbsOptimized             bool
-	ExpectedRootDevice       string
-	InstanceType             string
-	IamInstanceProfile       string
-	SourceAMI                string
-	SpotPrice                string
-	SpotPriceProduct         string
-	SubnetId                 string
-	Tags                     map[string]string
-	UserData                 string
-	UserDataFile             string
+	AssociatePublicIpAddress          bool
+	AvailabilityZone                  string
+	BlockDevices                      BlockDevices
+	Debug                             bool
+	EbsOptimized                      bool
+	ExpectedRootDevice                string
+	InstanceType                      string
+	IamInstanceProfile                string
+	SourceAMI                         string
+	SpotPrice                         string
+	SpotPriceProduct                  string
+	SubnetId                          string
+	Tags                              map[string]string
+	UserData                          string
+	UserDataFile                      string
+	InstanceInitiatedShutdownBehavior string
 
 	instanceId  string
 	spotRequest *ec2.SpotInstanceRequest
@@ -44,7 +45,25 @@ func (s *StepRunSourceInstance) Run(state multistep.StateBag) multistep.StepActi
 
 	securityGroupIds := make([]*string, len(tempSecurityGroupIds))
 	for i, sg := range tempSecurityGroupIds {
-		securityGroupIds[i] = aws.String(sg)
+		found := false
+		for i := 0; i < 5; i++ {
+			time.Sleep(time.Duration(i) * 5 * time.Second)
+			log.Printf("[DEBUG] Describing tempSecurityGroup to ensure it is available: %s", sg)
+			_, err := ec2conn.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
+				GroupIds: []*string{aws.String(sg)},
+			})
+			if err == nil {
+				log.Printf("[DEBUG] Found security group %s", sg)
+				found = true
+				break
+			}
+			log.Printf("[DEBUG] Error in querying security group %s", err)
+		}
+		if found {
+			securityGroupIds[i] = aws.String(sg)
+		} else {
+			state.Put("error", fmt.Errorf("Timeout waiting for security group %s to become available", sg))
+		}
 	}
 
 	userData := s.UserData
@@ -128,6 +147,10 @@ func (s *StepRunSourceInstance) Run(state multistep.StateBag) multistep.StepActi
 			state.Put("error", err)
 			ui.Error(err.Error())
 			return multistep.ActionHalt
+		} else {
+			// Add 0.5 cents to minimum spot bid to ensure capacity will be available
+			// Avoids price-too-low error in active markets which can fluctuate
+			price = price + 0.005
 		}
 
 		spotPrice = strconv.FormatFloat(price, 'f', -1, 64)
@@ -137,7 +160,6 @@ func (s *StepRunSourceInstance) Run(state multistep.StateBag) multistep.StepActi
 
 	if spotPrice == "" || spotPrice == "0" {
 		runOpts := &ec2.RunInstancesInput{
-			KeyName:             &keyName,
 			ImageId:             &s.SourceAMI,
 			InstanceType:        &s.InstanceType,
 			UserData:            &userData,
@@ -147,6 +169,10 @@ func (s *StepRunSourceInstance) Run(state multistep.StateBag) multistep.StepActi
 			BlockDeviceMappings: s.BlockDevices.BuildLaunchDevices(),
 			Placement:           &ec2.Placement{AvailabilityZone: &s.AvailabilityZone},
 			EbsOptimized:        &s.EbsOptimized,
+		}
+
+		if keyName != "" {
+			runOpts.KeyName = &keyName
 		}
 
 		if s.SubnetId != "" && s.AssociatePublicIpAddress {
@@ -164,6 +190,10 @@ func (s *StepRunSourceInstance) Run(state multistep.StateBag) multistep.StepActi
 			runOpts.SecurityGroupIds = securityGroupIds
 		}
 
+		if s.ExpectedRootDevice == "ebs" {
+			runOpts.InstanceInitiatedShutdownBehavior = &s.InstanceInitiatedShutdownBehavior
+		}
+
 		runResp, err := ec2conn.RunInstances(runOpts)
 		if err != nil {
 			err := fmt.Errorf("Error launching source instance: %s", err)
@@ -176,29 +206,35 @@ func (s *StepRunSourceInstance) Run(state multistep.StateBag) multistep.StepActi
 		ui.Message(fmt.Sprintf(
 			"Requesting spot instance '%s' for: %s",
 			s.InstanceType, spotPrice))
-		runSpotResp, err := ec2conn.RequestSpotInstances(&ec2.RequestSpotInstancesInput{
-			SpotPrice: &spotPrice,
-			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-				KeyName:            &keyName,
-				ImageId:            &s.SourceAMI,
-				InstanceType:       &s.InstanceType,
-				UserData:           &userData,
-				IamInstanceProfile: &ec2.IamInstanceProfileSpecification{Name: &s.IamInstanceProfile},
-				NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
-					&ec2.InstanceNetworkInterfaceSpecification{
-						DeviceIndex:              aws.Int64(0),
-						AssociatePublicIpAddress: &s.AssociatePublicIpAddress,
-						SubnetId:                 &s.SubnetId,
-						Groups:                   securityGroupIds,
-						DeleteOnTermination:      aws.Bool(true),
-					},
+
+		runOpts := &ec2.RequestSpotLaunchSpecification{
+			ImageId:            &s.SourceAMI,
+			InstanceType:       &s.InstanceType,
+			UserData:           &userData,
+			IamInstanceProfile: &ec2.IamInstanceProfileSpecification{Name: &s.IamInstanceProfile},
+			NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
+				&ec2.InstanceNetworkInterfaceSpecification{
+					DeviceIndex:              aws.Int64(0),
+					AssociatePublicIpAddress: &s.AssociatePublicIpAddress,
+					SubnetId:                 &s.SubnetId,
+					Groups:                   securityGroupIds,
+					DeleteOnTermination:      aws.Bool(true),
 				},
-				Placement: &ec2.SpotPlacement{
-					AvailabilityZone: &availabilityZone,
-				},
-				BlockDeviceMappings: s.BlockDevices.BuildLaunchDevices(),
-				EbsOptimized:        &s.EbsOptimized,
 			},
+			Placement: &ec2.SpotPlacement{
+				AvailabilityZone: &availabilityZone,
+			},
+			BlockDeviceMappings: s.BlockDevices.BuildLaunchDevices(),
+			EbsOptimized:        &s.EbsOptimized,
+		}
+
+		if keyName != "" {
+			runOpts.KeyName = &keyName
+		}
+
+		runSpotResp, err := ec2conn.RequestSpotInstances(&ec2.RequestSpotInstancesInput{
+			SpotPrice:           &spotPrice,
+			LaunchSpecification: runOpts,
 		})
 		if err != nil {
 			err := fmt.Errorf("Error launching source spot instance: %s", err)

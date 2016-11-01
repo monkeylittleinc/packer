@@ -82,6 +82,7 @@ type Config struct {
 	common.HTTPConfig   `mapstructure:",squash"`
 	common.ISOConfig    `mapstructure:",squash"`
 	Comm                communicator.Config `mapstructure:",squash"`
+	common.FloppyConfig `mapstructure:",squash"`
 
 	ISOSkipCache    bool       `mapstructure:"iso_skip_cache"`
 	Accelerator     string     `mapstructure:"accelerator"`
@@ -92,7 +93,6 @@ type Config struct {
 	DiskDiscard     string     `mapstructure:"disk_discard"`
 	SkipCompaction  bool       `mapstructure:"skip_compaction"`
 	DiskCompression bool       `mapstructure:"disk_compression"`
-	FloppyFiles     []string   `mapstructure:"floppy_files"`
 	Format          string     `mapstructure:"format"`
 	Headless        bool       `mapstructure:"headless"`
 	DiskImage       bool       `mapstructure:"disk_image"`
@@ -139,6 +139,9 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, error) {
 		return nil, err
 	}
 
+	var errs *packer.MultiError
+	warnings := make([]string, 0)
+
 	if b.config.DiskSize == 0 {
 		b.config.DiskSize = 40000
 	}
@@ -155,8 +158,20 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, error) {
 		if runtime.GOOS == "windows" {
 			b.config.Accelerator = "tcg"
 		} else {
-			b.config.Accelerator = "kvm"
+			// /dev/kvm is a kernel module that may be loaded if kvm is
+			// installed and the host supports VT-x extensions. To make sure
+			// this will actually work we need to os.Open() it. If os.Open fails
+			// the kernel module was not installed or loaded correctly.
+			if fp, err := os.Open("/dev/kvm"); err != nil {
+				b.config.Accelerator = "tcg"
+			} else {
+				fp.Close()
+				b.config.Accelerator = "kvm"
+			}
 		}
+		log.Printf("use detected accelerator: %s", b.config.Accelerator)
+	} else {
+		log.Printf("use specified accelerator: %s", b.config.Accelerator)
 	}
 
 	if b.config.MachineType == "" {
@@ -203,9 +218,7 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, error) {
 		b.config.Format = "qcow2"
 	}
 
-	if b.config.FloppyFiles == nil {
-		b.config.FloppyFiles = make([]string, 0)
-	}
+	errs = packer.MultiErrorAppend(errs, b.config.FloppyConfig.Prepare(&b.config.ctx)...)
 
 	if b.config.NetDevice == "" {
 		b.config.NetDevice = "virtio-net"
@@ -219,9 +232,6 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, error) {
 	if b.config.SSHWaitTimeout != 0 {
 		b.config.Comm.SSHTimeout = b.config.SSHWaitTimeout
 	}
-
-	var errs *packer.MultiError
-	warnings := make([]string, 0)
 
 	if b.config.ISOSkipCache {
 		b.config.ISOChecksumType = "none"
@@ -354,7 +364,8 @@ func (b *Builder) Run(ui packer.Ui, hook packer.Hook, cache packer.Cache) (packe
 
 	steps = append(steps, new(stepPrepareOutputDir),
 		&common.StepCreateFloppy{
-			Files: b.config.FloppyFiles,
+			Files:       b.config.FloppyConfig.FloppyFiles,
+			Directories: b.config.FloppyConfig.FloppyDirectories,
 		},
 		new(stepCreateDisk),
 		new(stepCopyDisk),
@@ -364,19 +375,40 @@ func (b *Builder) Run(ui packer.Ui, hook packer.Hook, cache packer.Cache) (packe
 			HTTPPortMin: b.config.HTTPPortMin,
 			HTTPPortMax: b.config.HTTPPortMax,
 		},
-		new(stepForwardSSH),
+	)
+
+	if b.config.Comm.Type != "none" {
+		steps = append(steps,
+			new(stepForwardSSH),
+		)
+	}
+
+	steps = append(steps,
 		new(stepConfigureVNC),
 		steprun,
 		&stepBootWait{},
 		&stepTypeBootCommand{},
-		&communicator.StepConnect{
-			Config:    &b.config.Comm,
-			Host:      commHost,
-			SSHConfig: sshConfig,
-			SSHPort:   commPort,
-		},
+	)
+
+	if b.config.Comm.Type != "none" {
+		steps = append(steps,
+			&communicator.StepConnect{
+				Config:    &b.config.Comm,
+				Host:      commHost,
+				SSHConfig: sshConfig,
+				SSHPort:   commPort,
+			},
+		)
+	}
+
+	steps = append(steps,
 		new(common.StepProvision),
+	)
+	steps = append(steps,
 		new(stepShutdown),
+	)
+
+	steps = append(steps,
 		new(stepConvertDisk),
 	)
 
@@ -384,20 +416,13 @@ func (b *Builder) Run(ui packer.Ui, hook packer.Hook, cache packer.Cache) (packe
 	state := new(multistep.BasicStateBag)
 	state.Put("cache", cache)
 	state.Put("config", &b.config)
+	state.Put("debug", b.config.PackerDebug)
 	state.Put("driver", driver)
 	state.Put("hook", hook)
 	state.Put("ui", ui)
 
 	// Run
-	if b.config.PackerDebug {
-		b.runner = &multistep.DebugRunner{
-			Steps:   steps,
-			PauseFn: common.MultistepDebugFn(ui),
-		}
-	} else {
-		b.runner = &multistep.BasicRunner{Steps: steps}
-	}
-
+	b.runner = common.NewRunnerWithPauseFn(steps, b.config.PackerConfig, ui, state)
 	b.runner.Run(state)
 
 	// If there was an error, return that
