@@ -37,6 +37,8 @@ type Config struct {
 	VMName       string   `mapstructure:"vm_name"`
 	VMNetwork    string   `mapstructure:"vm_network"`
 
+	KeepInputArtifact bool `mapstructure:"keep_input_artifact"`
+
 	ctx interpolate.Context
 }
 
@@ -95,7 +97,7 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 
 func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (packer.Artifact, bool, error) {
 	if _, ok := builtins[artifact.BuilderId()]; !ok {
-		return nil, false, fmt.Errorf("Unknown artifact type, can't build box: %s", artifact.BuilderId())
+		return nil, p.config.KeepInputArtifact, fmt.Errorf("Unknown artifact type, can't build box: %s", artifact.BuilderId())
 	}
 
 	source := ""
@@ -107,7 +109,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	}
 
 	if source == "" {
-		return nil, false, fmt.Errorf("VMX, OVF or OVA file not found")
+		return nil, p.config.KeepInputArtifact, fmt.Errorf("VMX, OVF or OVA file not found")
 	}
 
 	ovftool_uri := fmt.Sprintf("vi://%s:%s@%s/%s/host/%s",
@@ -133,10 +135,10 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return nil, false, fmt.Errorf("Failed: %s\n", err)
+		return nil, p.config.KeepInputArtifact, fmt.Errorf("Failed: %s\n", err)
 	}
 
-	return artifact, false, nil
+	return artifact, p.config.KeepInputArtifact, nil
 }
 
 func (p *PostProcessor) BuildArgs(source, ovftool_uri string) ([]string, error) {
