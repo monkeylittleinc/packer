@@ -2,6 +2,8 @@ sudo: false
 language: go
 go:
 - 1.7
+install:
+- make deps
 script:
 - sed -i -e "s/const Version = .*/const Version = \"${TRAVIS_TAG}\"/g" version/version.go
 - NOSIGN=true NOTAG=true VERSION=${TRAVIS_TAG} make release
