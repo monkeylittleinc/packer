@@ -28,7 +28,6 @@ func (a *Artifact) BuilderId() string {
 	return a.BuilderIdValue
 }
 
-
 func (a *Artifact) Files() []string {
 	filePaths := make([]string, 0, len(a.Amis))
 	for region, id := range a.Amis {
