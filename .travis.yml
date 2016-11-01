@@ -1,21 +1,17 @@
 sudo: false
-
 language: go
-
 go:
-  - 1.6
-
-install:
-  - make deps
-
+- 1.7
 script:
-  - GOMAXPROCS=2 make ci
-
-branches:
-  only:
-    - master
-
-matrix:
-  fast_finish: true
-  allow_failures:
-    - go: 1.4.3
+- sed -i -e "s/const Version = .*/const Version = \"${TRAVIS_TAG}\"/g" version/version.go
+- NOSIGN=true NOTAG=true VERSION=${TRAVIS_TAG} make release
+deploy:
+  provider: releases
+  api_key:
+    secure: Zd/vXO648wwO43SM0aUvLHDPqzRSLISfcRpU00Lmdfkj+ND5Q5Turr6bCKGNT0D4kE8pBIkgb83KY3q7Wk9qtIxgdJdCAsaVu9eZpJcKE+XjlpQ1zDBTug4AySwC6Qyi8UoFEd9JPcy7ioPquhQTfAFWaLS7YvEZZVjwIRrrzQGtzdSy+rNnABRXE4QjPyD31p5TTtWmvf2MS5zoxeuXEQotf3ssZ/qKn9m0ycVdUscjUlK2IecAp0+J7HyvMpBbjO5fVzhc9Cwp344Ha6jcxdiE/iJVF1fzUB6tsvnAn7OQeFChFWxq9kUm1HlyXN1DBCAlf911JmVojXzwY951OWj1e9C6dY8aCRN4da2+qlVsLXNQUIN/rg5leZmLpynjnZ4EEjAXd0mcfE0RGunCjCNOvwTY5MMuTM1Qy15FjyfuC3SrLef4vQ+EfvvhCCKX5kKG21F9rtO3jEffw2NpHJGRXZ/uPh4nk6BTN4CdtTTjj3h7UrDaF9+m1rXhzsjyxw9ByfE59/1fweUhHrKxNDhz57zd6Eb8AkX/RLlrxes9pRhSGtrZHwegfpTjIbTQ9tz0dWcIb/RJSpGe13k7t+hCsjIrZqS+iG7JYZo0o2eVb9QRnaat4+42fILB1VJVnX5LWAZOGBC2gRBzTxS7ya26REaginfvHUgie0QPRjE=
+  file:
+    - pkg/dist/packer_${TRAVIS_TAG}_darwin_amd64.zip
+    - pkg/dist/packer_${TRAVIS_TAG}_linux_amd64.zip
+  on:
+    tags: true
+    repo: monkeylittleinc/packer
