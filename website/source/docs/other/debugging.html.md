@@ -22,8 +22,13 @@ continuing. This will allow you to inspect state and so on.
 In debug mode once the remote instance is instantiated, Packer will emit to the
 current directory an ephemeral private ssh key as a .pem file. Using that you
 can `ssh -i <key.pem>` into the remote build instance and see what is going on
-for debugging. The ephemeral key will be deleted at the end of the packer run
-during cleanup.
+for debugging. The key will only be emitted for cloud-based builders. The
+ephemeral key will be deleted at the end of the packer run during cleanup.
+
+For a local builder, the SSH session initiated will be visible in the detail
+provided when `PACKER_LOG=1` environment variable is set prior to a build,
+and you can connect to the local machine using the userid and password defined
+in the kickstart or preseed associated with initialzing the local VM.
 
 ### Windows
 
@@ -40,7 +45,7 @@ or may not appear to work correctly. In these cases, it is sometimes helpful to
 see more details about what Packer is actually doing.
 
 Packer has detailed logs which can be enabled by setting the `PACKER_LOG`
-environmental variable to any value like this
+environmental variable to any value but `""` (empty string) and `"0"` like this
 `PACKER_LOG=1 packer build <config.json>`. This will cause detailed logs to
 appear on stderr. The logs contain log messages from Packer as well as any
 plugins that are being used. Log messages from plugins are prefixed by their

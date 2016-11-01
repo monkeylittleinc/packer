@@ -101,8 +101,44 @@ builder.
     for the VM. By default, this is 40000 (about 40 GB).
 
 -   `export_opts` (array of strings) - Additional options to pass to the
-    `VBoxManage export`. This can be useful for passing product information to
-    include in the resulting appliance file.
+    [VBoxManage export](https://www.virtualbox.org/manual/ch08.html#vboxmanage-export).
+    This can be useful for passing product information to include in the
+    resulting appliance file. Packer JSON configuration file example:
+
+    ``` {.json}
+    {
+      "type": "virtualbox-iso",
+      "export_opts":
+      [
+        "--manifest",
+        "--vsys", "0",
+        "--description", "{{user `vm_description`}}",
+        "--version", "{{user `vm_version`}}"
+      ],
+      "format": "ova",
+    }
+    ```
+
+    A VirtualBox [VM description](https://www.virtualbox.org/manual/ch08.html#idm3756)
+    may contain arbitrary strings; the GUI interprets HTML formatting.
+    However, the JSON format does not allow arbitrary newlines within a
+    value. Add a multi-line description by preparing the string in the
+    shell before the packer call like this (shell `>` continuation
+    character snipped for easier copy & paste):
+
+    ``` {.shell}
+
+    vm_description='some
+    multiline
+    description'
+
+    vm_version='0.2.0'
+
+    packer build \
+        -var "vm_description=${vm_description}" \
+        -var "vm_version=${vm_version}"         \
+        "packer_conf.json"
+    ```
 
 -   `floppy_files` (array of strings) - A list of files to place onto a floppy
     disk that is attached when the VM is booted. This is most useful for
@@ -113,6 +149,12 @@ builder.
     creating sub-directories on the floppy. Wildcard characters (\*, ?,
     and \[\]) are allowed. Directory names are also allowed, which will add all
     the files found in the directory to the floppy.
+
+-   `floppy_dirs` (array of strings) - A list of directories to place onto
+    the floppy disk recursively. This is similar to the `floppy_files` option
+    except that the directory structure is preserved. This is useful for when
+    your floppy disk includes drivers or if you just want to organize its
+    contents as a hierarchy. Wildcard characters (\*, ?, and \[\]) are allowed.
 
 -   `format` (string) - Either "ovf" or "ova", this specifies the output format
     of the exported virtual machine. This defaults to "ovf".
@@ -154,6 +196,13 @@ builder.
     is attached to an AHCI SATA controller. When set to "scsi", the drive is
     attached to an LsiLogic SCSI controller.
 
+-   `hard_drive_nonrotational` (boolean) - Forces some guests (i.e. Windows 7+)
+    to treat disks as SSDs and stops them from performing disk fragmentation.
+
+-   `hard_drive_discard` (boolean) - When this value is set to true, a VDI
+    image will be shrunk in response to the trim command from the guest OS.
+    The size of the cleared area must be at least 1MB.
+
 -   `headless` (boolean) - Packer defaults to building VirtualBox virtual
     machines by launching a GUI that shows the console of the machine
     being built. When this value is set to true, the machine will start without
@@ -187,12 +236,20 @@ builder.
     URLs must point to the same file (same checksum). By default this is empty
     and `iso_url` is used. Only one of `iso_url` or `iso_urls` can be specified.
 
+-   `keep_registered` (boolean) - Set this to `true` if you would like to keep
+    the VM registered with virtualbox. Defaults to `false`.
+
 -   `output_directory` (string) - This is the path to the directory where the
     resulting virtual machine will be created. This may be relative or absolute.
     If relative, the path is relative to the working directory when `packer`
     is executed. This directory must not exist or be empty prior to running
     the builder. By default this is "output-BUILDNAME" where "BUILDNAME" is the
     name of the build.
+
+-   `post_shutdown_delay` (string) - The amount of time to wait after shutting
+    down the virtual machine. If you get the error `Error removing floppy
+    controller`, you might need to set this to `5m` or so. By default, the
+    delay is `0s`, or disabled.
 
 -   `shutdown_command` (string) - The command to use to gracefully shut down the
     machine once all the provisioning is done. By default this is an empty
@@ -290,9 +347,33 @@ by the proper key:
 
 -   `<pageUp>` `<pageDown>` - Simulates pressing the page up and page down keys.
 
+-   `<leftAlt>` `<rightAlt>`  - Simulates pressing the alt key.
+
+-   `<leftCtrl>` `<rightCtrl>` - Simulates pressing the ctrl key.
+
+-   `<leftShift>` `<rightShift>` - Simulates pressing the shift key.
+
+-   `<leftAltOn>` `<rightAltOn>`  - Simulates pressing and holding the alt key.
+
+-   `<leftCtrlOn>` `<rightCtrlOn>` - Simulates pressing and holding the ctrl key.
+
+-   `<leftShiftOn>` `<rightShiftOn>` - Simulates pressing and holding the shift key.
+
+-   `<leftAltOff>` `<rightAltOff>`  - Simulates releasing a held alt key.
+
+-   `<leftCtrlOff>` `<rightCtrlOff>` - Simulates releasing a held ctrl key.
+
+-   `<leftShiftOff>` `<rightShiftOff>` - Simulates releasing a held shift key.
+
 -   `<wait>` `<wait5>` `<wait10>` - Adds a 1, 5 or 10 second pause before
     sending any additional keys. This is useful if you have to generally wait
     for the UI to update before typing more.
+
+When using modifier keys `ctrl`, `alt`, `shift` ensure that you release them,
+otherwise they will be held down until the machine reboots. Use lowercase
+characters as well inside modifiers.
+
+For example: to simulate ctrl+c use `<leftCtrlOn>c<leftCtrlOff>`.
 
 In addition to the special keys, each command to type is treated as a
 [configuration template](/docs/templates/configuration-templates.html). The

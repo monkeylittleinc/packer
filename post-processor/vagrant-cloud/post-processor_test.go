@@ -2,8 +2,9 @@ package vagrantcloud
 
 import (
 	"bytes"
-	"github.com/mitchellh/packer/packer"
 	"testing"
+
+	"github.com/mitchellh/packer/packer"
 )
 
 func testGoodConfig() map[string]interface{} {
@@ -44,11 +45,11 @@ func testUi() *packer.BasicUi {
 	}
 }
 
-func testPostProcessor_ImplementsPostProcessor(t *testing.T) {
+func TestPostProcessor_ImplementsPostProcessor(t *testing.T) {
 	var _ packer.PostProcessor = new(PostProcessor)
 }
 
-func testproviderFromBuilderName(t *testing.T) {
+func TestProviderFromBuilderName(t *testing.T) {
 	if providerFromBuilderName("foobar") != "foobar" {
 		t.Fatal("should copy unknown provider")
 	}

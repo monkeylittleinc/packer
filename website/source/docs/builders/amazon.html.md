@@ -89,6 +89,7 @@ Packer to work:
 
 ``` {.javascript}
 {
+  "Version": "2012-10-17",
   "Statement": [{
       "Effect": "Allow",
       "Action" : [
@@ -114,8 +115,15 @@ Packer to work:
         "ec2:DescribeSnapshots",
         "ec2:DescribeImages",
         "ec2:RegisterImage",
+        "ec2:DeregisterImage",
         "ec2:CreateTags",
-        "ec2:ModifyImageAttribute"
+        "ec2:ModifyImageAttribute",
+        "ec2:GetPasswordData",
+        "ec2:DescribeTags",
+        "ec2:DescribeImageAttribute",
+        "ec2:CopyImage",
+        "ec2:DescribeRegions",
+        "ec2:ModifyInstanceAttribute"
       ],
       "Resource" : "*"
   }]
@@ -147,3 +155,17 @@ work, but specifics will depend on your use-case.
     ]
 }
 ```
+
+### Checking that system time is current
+
+Amazon uses the current time as part of the [request signing
+process](http://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html). If
+your system clock is too skewed from the current time, your requests might
+fail. If that's the case, you might see an error like this:
+
+    ==> amazon-ebs: Error querying AMI: AuthFailure: AWS was not able to validate the provided access credentials
+
+If you suspect your system's date is wrong, you can compare it against
+http://www.time.gov/. On Linux/OS X, you can run the `date` command to get the
+current time. If you're on Linux, you can try setting the time with ntp by
+running `sudo ntpd -q`.
